@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASCIIquarium</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000011;
+            font-family: 'Courier New', monospace;
+            color: #00ffff;
+            overflow: hidden;
+            font-size: 11px;
+            line-height: 1;
+        }
+
+        #aquarium {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background: #000022;
+            overflow: hidden;
+        }
+
+        .entity {
+            position: absolute;
+            white-space: pre;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            line-height: 1;
+            pointer-events: none;
+            user-select: none;
+        }
+
+        /* Water line */
+        .water-line { 
+            color: #00aaaa; 
+            z-index: 8;
+            white-space: nowrap;
+            overflow: hidden;
+        }
+
+        /* Colorful fish */
+        .fish-yellow { color: #ffff00; }
+        .fish-red { color: #ff4444; }
+        .fish-green { color: #44ff44; }
+        .fish-blue { color: #4488ff; }
+        .fish-magenta { color: #ff44ff; }
+        .fish-cyan { color: #44ffff; }
+        .fish-white { color: #ffffff; }
+        .fish-orange { color: #ff8844; }
+        .fish-pink { color: #ffaaaa; }
+        .fish-lime { color: #aaff44; }
+
+        /* Other entities */
+        .seaweed { color: #44aa44; z-index: 21; bottom: 0; }
+        .castle { color: #888888; z-index: 22; }
+        .bubble { color: #88ccff; z-index: 5; }
+        .shark { color: #aaaaaa; z-index: 2; }
+
+        @keyframes sway {
+            0%, 100% { transform: rotate(-2deg); }
+            50% { transform: rotate(2deg); }
+        }
+
+        .seaweed {
+            animation: sway 3s ease-in-out infinite;
+            transform-origin: bottom center;
+        }
+    </style>
+</head>
+<body>
+    <div id="aquarium"></div>
+
+    <script>
+        class ASCIIquarium {
+            constructor() {
+                this.aquarium = document.getElementById('aquarium');
+                this.width = window.innerWidth;
+                this.height = window.innerHeight;
+                this.entities = [];
+                this.waterLineY = 60; // Y position where water line starts
+                
+                // Exact fish ASCII art from the original [1]
+                this.fishArt = [
+                    // Large fish
+                    {
+                        left: "       \\\n     ...\\...,\n\\  /'       \\\n >=     (  ' >\n/  \\      / /\n    `\"'\"'/''",
+                        right: "      /\n  ,../...\n /'       '\\  /\n< '  )     =<\n \\ \\      /  \\\n  `'\\\"'\"'`"
+                    },
+                    // Medium fish
+                    {
+                        left: "    \\\n\\ /--\\\n>=  (o>\n/ \\__/\n    /",
+                        right: "  /\n /--\\ /\n<o)  =<\n \\__/ \\\n  \\"
+                    },
+                    // Small fish
+                    {
+                        left: "   ..,\n>=( '>\n  '',",
+                        right: " ,..\n<' )=<\n ``'"
+                    },
+                    // Tiny fish
+                    {
+                        left: "  __\n><_'>\n   '",
+                        right: " __\n<'_><\n `"
+                    },
+                    // Another style
+                    {
+                        left: "   \\\n  / \\\n>=_('>\n  \\_/\n   /",
+                        right: "  /\n / \\\n<')_=<\n \\_/\n  \\"
+                    }
+                ];
+
+                this.init();
+            }
+
+            init() {
+                this.createWaterLine();
+                this.createCastle();
+                this.createSeaweed();
+                
+                // Create lots of colorful fish
+                for (let i = 0; i < 25; i++) {
+                    setTimeout(() => this.addFish(), i * 200);
+                }
+                
+                // Much fewer bubbles - only every 3-4 seconds
+                setInterval(() => this.createBubble(), 3500);
+                
+                this.animate();
+                
+                window.addEventListener('resize', () => {
+                    this.width = window.innerWidth;
+                    this.height = window.innerHeight;
+                    // Recreate waterline on resize
+                    this.recreateWaterLine();
+                });
+            }
+
+            createWaterLine() {
+                // Based on original code [1] - calculate proper segment repeats
+                const waterSegments = [
+                    "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+                    "^^^^ ^^^  ^^^   ^^^    ^^^^      ",
+                    "^^^^      ^^^^     ^^^    ^^     ",
+                    "^^      ^^^^      ^^^    ^^^^^^  "
+                ];
+
+                // Calculate how many characters wide the screen is (approximate)
+                const charWidth = 7; // approximate character width in pixels
+                const screenWidthInChars = Math.ceil(this.width / charWidth);
+                const segmentSize = waterSegments[0].length;
+                const segmentRepeat = Math.ceil(screenWidthInChars / segmentSize) + 1;
+
+                waterSegments.forEach((segment, i) => {
+                    const waterLine = document.createElement('div');
+                    waterLine.className = 'entity water-line';
+                    waterLine.id = `water-line-${i}`;
+                    waterLine.style.left = '0px';
+                    waterLine.style.top = (this.waterLineY + i * 12) + 'px';
+                    waterLine.style.width = '100vw';
+                    // Repeat the segment enough times to cover any screen width
+                    waterLine.innerHTML = segment.repeat(segmentRepeat);
+                    this.aquarium.appendChild(waterLine);
+                });
+            }
+
+            recreateWaterLine() {
+                // Remove existing water lines
+                for (let i = 0; i < 4; i++) {
+                    const existingLine = document.getElementById(`water-line-${i}`);
+                    if (existingLine) {
+                        existingLine.remove();
+                    }
+                }
+                // Create new ones with proper width
+                this.createWaterLine();
+            }
+
+            createCastle() {
+                const castle = document.createElement('div');
+                castle.className = 'entity castle';
+                castle.style.right = '50px';
+                castle.style.bottom = '20px';
+                
+                castle.innerHTML = 
+                    "               T~~\n" +
+                    "               |\n" +
+                    "              /^\\\n" +
+                    "             /   \\\n" +
+                    " _   _   _  /     \\  _   _   _\n" +
+                    "[ ]_[ ]_[ ]/ _   _ \\[ ]_[ ]_[ ]\n" +
+                    "|_=__-_ =_|_[ ]_[ ]_|_=-___-__|\n" +
+                    " | _- =  | =_ = _    |= _=   |\n" +
+                    " |= -[]  |- = _ =    |_-=_[] |\n" +
+                    " | =_    |= - ___    | =_ =  |\n" +
+                    " |=  []- |-  /| |\\   |=_ =[] |\n" +
+                    " |- =_   | =| | | |  |- = -  |\n" +
+                    " |_______|__|_|_|_|__|_______|";
+
+                this.aquarium.appendChild(castle);
+            }
+
+            createSeaweed() {
+                const seaweedCount = 8;
+                for (let i = 0; i < seaweedCount; i++) {
+                    const seaweed = document.createElement('div');
+                    seaweed.className = 'entity seaweed';
+                    
+                    const height = 4 + Math.floor(Math.random() * 6);
+                    let seaweedArt = '';
+                    
+                    for (let j = 0; j < height; j++) {
+                        if (j % 2 === 0) {
+                            seaweedArt += '(\\\n';
+                        } else {
+                            seaweedArt += ' )\\\n';
+                        }
+                    }
+                    seaweedArt += ' ||\n ||';
+                    
+                    seaweed.innerHTML = seaweedArt;
+                    seaweed.style.left = (i * 150 + Math.random() * 100) + 'px';
+                    seaweed.style.animationDelay = Math.random() * 3 + 's';
+                    
+                    this.aquarium.appendChild(seaweed);
+                }
+            }
+
+            addFish() {
+                const fishType = Math.floor(Math.random() * this.fishArt.length);
+                const fish = this.fishArt[fishType];
+                
+                // Fish always move in their original direction - no flipping!
+                const direction = Math.random() > 0.5 ? 1 : -1;
+                const fishArt = direction > 0 ? fish.left : fish.right;
+                
+                const colors = ['fish-yellow', 'fish-red', 'fish-green', 'fish-blue', 
+                               'fish-magenta', 'fish-cyan', 'fish-white', 'fish-orange', 
+                               'fish-pink', 'fish-lime'];
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                
+                const fishElement = document.createElement('div');
+                fishElement.className = `entity ${color}`;
+                fishElement.innerHTML = fishArt;
+                
+                const entity = {
+                    element: fishElement,
+                    type: 'fish',
+                    x: direction > 0 ? -80 : this.width + 80,
+                    y: 150 + Math.random() * (this.height - 350),
+                    speedX: (0.3 + Math.random() * 1.2) * direction,
+                    speedY: (Math.random() - 0.5) * 0.4,
+                    direction: direction,
+                    bubbleTimer: Math.random() * 400,
+                    verticalBounce: Math.random() * 0.02 + 0.01,
+                    originalY: 0
+                };
+                
+                entity.originalY = entity.y;
+                
+                fishElement.style.left = entity.x + 'px';
+                fishElement.style.top = entity.y + 'px';
+                
+                this.aquarium.appendChild(fishElement);
+                this.entities.push(entity);
+            }
+
+            createBubble() {
+                // Random chance to skip bubble creation (even fewer bubbles)
+                if (Math.random() > 0.6) return;
+                
+                const bubbleElement = document.createElement('div');
+                bubbleElement.className = 'entity bubble';
+                bubbleElement.innerHTML = Math.random() > 0.5 ? 'o' : '.';
+                
+                const entity = {
+                    element: bubbleElement,
+                    type: 'bubble',
+                    x: Math.random() * this.width,
+                    y: this.height + 20,
+                    speedY: -0.4 - Math.random() * 1.0,
+                    speedX: (Math.random() - 0.5) * 0.3
+                };
+                
+                bubbleElement.style.left = entity.x + 'px';
+                bubbleElement.style.top = entity.y + 'px';
+                
+                this.aquarium.appendChild(bubbleElement);
+                this.entities.push(entity);
+            }
+
+            createFishBubble(fish) {
+                const bubbleElement = document.createElement('div');
+                bubbleElement.className = 'entity bubble';
+                bubbleElement.innerHTML = '.';
+                
+                const entity = {
+                    element: bubbleElement,
+                    type: 'bubble',
+                    x: fish.x + (fish.direction > 0 ? 30 : -10),
+                    y: fish.y + 15,
+                    speedY: -0.2 - Math.random() * 0.4,
+                    speedX: (Math.random() - 0.5) * 0.1
+                };
+                
+                bubbleElement.style.left = entity.x + 'px';
+                bubbleElement.style.top = entity.y + 'px';
+                
+                this.aquarium.appendChild(bubbleElement);
+                this.entities.push(entity);
+            }
+
+            animate() {
+                this.entities.forEach((entity, index) => {
+                    // Update position
+                    if (entity.speedX !== undefined) entity.x += entity.speedX;
+                    if (entity.speedY !== undefined) entity.y += entity.speedY;
+                    
+                    // Fish specific behavior
+                    if (entity.type === 'fish') {
+                        // Add gentle up-down swimming motion
+                        entity.y += Math.sin(Date.now() * entity.verticalBounce) * 0.1;
+                        
+                        // Boundary checking
+                        if (entity.y < 130) {
+                            entity.speedY = Math.abs(entity.speedY);
+                        }
+                        if (entity.y > this.height - 200) {
+                            entity.speedY = -Math.abs(entity.speedY);
+                        }
+                        
+                        // Create bubbles much less frequently
+                        entity.bubbleTimer++;
+                        if (entity.bubbleTimer > 300 && Math.random() > 0.995) {
+                            this.createFishBubble(entity);
+                            entity.bubbleTimer = 0;
+                        }
+                    }
+                    
+                    // Bubble specific behavior - stop at water line
+                    if (entity.type === 'bubble') {
+                        // Stop bubbles at the water line
+                        if (entity.y <= this.waterLineY + 10) {
+                            entity.element.remove();
+                            this.entities.splice(index, 1);
+                            return;
+                        }
+                    }
+                    
+                    // Remove entities that are off screen
+                    if ((entity.x > this.width + 100 && entity.speedX > 0) ||
+                        (entity.x < -100 && entity.speedX < 0) ||
+                        (entity.y < -30 && entity.speedY < 0)) {
+                        
+                        entity.element.remove();
+                        this.entities.splice(index, 1);
+                        
+                        // Respawn fish after a delay
+                        if (entity.type === 'fish') {
+                            setTimeout(() => this.addFish(), 1000 + Math.random() * 3000);
+                        }
+                        return;
+                    }
+                    
+                    // Update DOM position
+                    entity.element.style.left = Math.round(entity.x) + 'px';
+                    entity.element.style.top = Math.round(entity.y) + 'px';
+                });
+                
+                requestAnimationFrame(() => this.animate());
+            }
+        }
+
+        // Initialize when page loads
+        window.addEventListener('load', () => {
+            new ASCIIquarium();
+        });
+
+        // Handle keyboard controls
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'q' || e.key === 'Q') {
+                if (confirm('Quit ASCIIquarium?')) {
+                    window.close();
+                }
+            }
+            if (e.key === 'r' || e.key === 'R') {
+                location.reload();
+            }
+        });
+    </script>
+</body>
+</html>
